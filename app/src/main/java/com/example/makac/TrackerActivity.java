@@ -1,7 +1,13 @@
 package com.example.makac;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.location.Criteria;
+import android.location.GpsStatus;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.text.format.Formatter;
 import android.util.Log;
@@ -10,19 +16,34 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-public class TrackerActivity extends Activity {
+public class TrackerActivity extends Activity implements LocationListener {
     private static final String TAG = "TrackerActivity";
     private long start;
+    boolean isGPSEnabled = false;
+    boolean isNetworkEnabled = false;
+    boolean canGetLocation = false;
+
+    double latitude;
+    double longitude;
+
+    private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 1;
+    private static final long MIN_TIME_BW_UPDATES = 0;
+
+    protected LocationManager locationManager;
+    private Location location;
+
 
     /**
      * This method set actual time and hide start button and show pause button
@@ -159,6 +180,24 @@ public class TrackerActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_tracker);
+        location = getLocation();
+        if (location != null) {
+            this.latitude = location.getLatitude();
+            this.longitude = location.getLongitude();
+        }
+//
+//        Toast.makeText(
+//                getApplicationContext(),
+//                "Your Location is -\nLat: " + latitude + "\nLong: "
+//                        + longitude, Toast.LENGTH_LONG).show();
+//        LocationManager lm = (LocationManager) getSystemService((Context.LOCATION_SERVICE));
+//        LocationListener ll = new myLocationlistener();
+//        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, ll);
+    }
+
+    public static boolean isLocationEnabled(Context context) {
+        //...............
+        return true;
     }
 
     @Override
@@ -166,6 +205,21 @@ public class TrackerActivity extends Activity {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.tracker, menu);
         return true;
+    }
+
+    @Override
+    protected void onPause() {
+        if (locationManager != null) {
+            locationManager.removeUpdates(this);
+        }
+        super.onPause();
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        getLocation();
     }
 
     @Override
@@ -182,11 +236,125 @@ public class TrackerActivity extends Activity {
 
     /**
      * Find TextView and getText from it return as String
+     *
      * @param resource
      * @return text from TextView
      */
     public String getStringFromTextViev(int resource) {
         TextView tx = (TextView) findViewById(resource);
         return tx.getText().toString();
+    }
+
+
+    @Override
+    public void onLocationChanged(Location location) {
+
+
+        double currentLatitude = location.getLatitude();
+        double currentLongitude = location.getLongitude();
+        float distance = 0;
+        Location crntLocation = new Location("crntlocation");
+        crntLocation.setLatitude(this.latitude);
+        crntLocation.setLongitude(this.longitude);
+
+        Location newLocation = new Location("newlocation");
+        newLocation.setLatitude(latitude);
+        newLocation.setLongitude(longitude);
+
+
+        //float distance = crntLocation.distanceTo(newLocation);  in meters
+        distance = location.distanceTo(newLocation) / 1000; // in km
+
+
+        TextView tx = (TextView) findViewById(R.id.distance);
+        tx.setText(String.valueOf(distance));
+
+
+
+        double speed = 0;
+        speed = newLocation.getSpeed() - crntLocation.getSpeed();
+
+        tx = (TextView) findViewById(R.id.pace);
+        tx.setText(String.valueOf(speed));
+
+        Toast.makeText(
+                getApplicationContext(),
+                distance + "   Your Location change sdssdsddsdssd ither is now -\nLat: " + location.getLatitude() + "\nLong: "
+                        + location.getLongitude(), Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
+    }
+
+
+    public Location getLocation() {
+        try {
+            locationManager = (LocationManager) this.getSystemService(LOCATION_SERVICE);
+
+            isGPSEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+
+            isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+            if (!isGPSEnabled && !isNetworkEnabled) {
+
+            } else {
+                this.canGetLocation = true;
+
+                if (isNetworkEnabled) {
+
+                    locationManager.requestLocationUpdates(
+                            LocationManager.NETWORK_PROVIDER,
+                            MIN_TIME_BW_UPDATES,
+                            MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
+
+                    if (locationManager != null) {
+                        location = locationManager
+                                .getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+
+                        if (location != null) {
+
+                            latitude = location.getLatitude();
+                            longitude = location.getLongitude();
+                        }
+                    }
+
+                }
+
+                if (isGPSEnabled) {
+                    if (location == null) {
+                        locationManager.requestLocationUpdates(
+                                LocationManager.GPS_PROVIDER,
+                                MIN_TIME_BW_UPDATES,
+                                MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
+
+                        if (locationManager != null) {
+                            location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+
+                            if (location != null) {
+                                latitude = location.getLatitude();
+                                longitude = location.getLongitude();
+                            }
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return location;
     }
 }
